@@ -1,93 +1,323 @@
-# Jeeru Vamshee
+# Web Copilot – Context-Aware Website Chatbot
+
+A **Web Copilot** system that embeds a chatbot beside a website and answers user queries **contextually based on the website’s content**, using **LLMs** and a **secure backend indexing approach**.
+
+---
+
+## 🚀 Project Overview
+
+Modern websites often require an intelligent assistant to help users understand content quickly.  
+This project builds a **website-aware AI copilot** that:
+
+- Runs alongside a website (via iframe)
+- Answers questions **based on the website’s content**
+- Uses a backend indexing strategy to overcome browser security limitations
+- Supports **Employee Login & Signup authentication**
+
+---
+
+## 🎯 Problem Statement
+
+Web-based chatbots cannot directly read iframe content due to browser security (same-origin policy).  
+This project solves the problem by:
+
+- Indexing website content in the backend
+- Injecting indexed content into LLM prompts
+- Providing accurate, context-aware responses
+
+---
+
+## 🧠 Key Features
+
+- Website embedded via iframe
+- Chatbot UI beside website
+- Backend-powered AI responses
+- Context-aware answers (website-specific)
+- Employee Login & Signup authentication
+- Secure API communication
+- Modular & scalable architecture
+
+---
+
+## 🛠 Tech Stack
+
+### Frontend
+- Next.js
+- React
+- CSS (custom styling)
+- iframe embedding
+
+### Backend
+- Python
+- Django
+- Django REST Framework
+- JWT Authentication (SimpleJWT)
+
+### AI / LLM
+- Groq / Hugging Face (LLM provider)
+- Prompt engineering
+- Error-handled AI calls
+
+### Tools
+- Git & GitHub
+- Postman (API testing)
+
+---
+
+## 🏗 Project Structure
+project-root/
+├── frontend/
+│ ├── pages/
+│ │ ├── login.js
+│ │ ├── signup.js
+│ │ └── index.js
+│ ├── styles/
+│ └── public/
+│
+├── backend/
+│ ├── webcopilot/
+│ ├── users/
+│ ├── manage.py
+│
+├── README.md
+└── .gitignore
 
 
+---
 
-## Getting started
+## 🔐 Authentication Setup (Login & Signup)
 
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
+### 🔑 Authentication Flow
 
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
+1. User signs up using email, username, and password
+2. Django creates a user record
+3. User logs in using credentials
+4. Backend returns:
+   - Access token
+   - Refresh token (JWT)
+5. Frontend stores tokens in `localStorage`
+6. Protected routes are accessed using access token
 
-## Add your files
+---
 
-* [Create](https://docs.gitlab.com/user/project/repository/web_editor/#create-a-file) or [upload](https://docs.gitlab.com/user/project/repository/web_editor/#upload-a-file) files
-* [Add files using the command line](https://docs.gitlab.com/topics/git/add_files/#add-files-to-a-git-repository) or push an existing Git repository with the following command:
+### 🧩 Backend (Django)
 
-```
-cd existing_repo
-git remote add origin https://gitlab.com/nueve/internship/jeeru-vamshee.git
-git branch -M main
-git push -uf origin main
-```
+- Custom User model
+- JWT authentication using `djangorestframework-simplejwt`
+- Endpoints:
 
-## Integrate with your tools
+POST /api/signup/
+POST /api/login/
+POST /api/refresh/
 
-* [Set up project integrations](https://gitlab.com/nueve/internship/jeeru-vamshee/-/settings/integrations)
 
-## Collaborate with your team
+- CORS enabled for frontend communication
+- CSRF exempted for API endpoints
 
-* [Invite team members and collaborators](https://docs.gitlab.com/user/project/members/)
-* [Create a new merge request](https://docs.gitlab.com/user/project/merge_requests/creating_merge_requests/)
-* [Automatically close issues from merge requests](https://docs.gitlab.com/user/project/issues/managing_issues/#closing-issues-automatically)
-* [Enable merge request approvals](https://docs.gitlab.com/user/project/merge_requests/approvals/)
-* [Set auto-merge](https://docs.gitlab.com/user/project/merge_requests/auto_merge/)
+---
 
-## Test and Deploy
+### 🧩 Frontend (Next.js)
 
-Use the built-in continuous integration in GitLab.
+- Login & Signup pages
+- Fetch API calls to Django backend
+- Token storage in `localStorage`
+- Redirects after successful authentication
 
-* [Get started with GitLab CI/CD](https://docs.gitlab.com/ci/quick_start/)
-* [Analyze your code for known vulnerabilities with Static Application Security Testing (SAST)](https://docs.gitlab.com/user/application_security/sast/)
-* [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/topics/autodevops/requirements/)
-* [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/user/clusters/agent/)
-* [Set up protected environments](https://docs.gitlab.com/ci/environments/protected_environments/)
+---
 
-***
+## 🟢 8-Week Development Plan
 
-# Editing this README
+### 🟢 Week 1 – Problem Understanding & Setup
+**Goals**
+- Understand the problem clearly
+- Set up development environment
 
-When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!). Thanks to [makeareadme.com](https://www.makeareadme.com/) for this template.
+**Tasks**
+- Finalize problem statement
+- Study:
+- How copilots work
+- LLM basics
+- iframe & browser security
+- Install & configure:
+- Python + Django
+- Node.js + Next.js
+- Git & GitHub
+- Create project structure
 
-## Suggestions for a good README
+**Deliverables**
+- ✅ Problem statement document
+- ✅ GitHub repository
+- ✅ Local dev environment working
 
-Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
+---
 
-## Name
-Choose a self-explaining name for your project.
+### 🟢 Week 2 – Frontend UI + Website Embedding
+**Goals**
+- Build the copilot UI
+- Embed website beside chatbot
 
-## Description
-Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
+**Tasks**
+- Create Next.js pages
+- Design layout:
+- Left → iframe (website)
+- Right → chatbot panel
+- Handle iframe loading issues
+- Add chatbot UI
 
-## Badges
-On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
+**Deliverables**
+- ✅ Website embedded using iframe
+- ✅ Copilot UI visible and usable
 
-## Visuals
-Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
+---
 
-## Installation
-Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
+### 🟢 Week 3 – Backend API (Django + REST)
+**Goals**
+- Build backend API for chatbot
 
-## Usage
-Use examples liberally, and show the expected output if you can. It's helpful to have inline the smallest example of usage that you can demonstrate, while providing links to more sophisticated examples if they are too long to reasonably include in the README.
+**Tasks**
+- Create Django project
+- Create `webcopilot` app
+- Build REST endpoint:
 
-## Support
-Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
+POST /api/ask/
 
-## Roadmap
-If you have ideas for releases in the future, it is a good idea to list them in the README.
+- Enable:
+- CORS
+- CSRF exemption
+- Test API with dummy responses
 
-## Contributing
-State if you are open to contributions and what your requirements are for accepting them.
+**Deliverables**
+- ✅ Django API working
+- ✅ Frontend → Backend communication
 
-For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
+---
 
-You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
+### 🟢 Week 4 – LLM Integration
+**Goals**
+- Make chatbot intelligent
 
-## Authors and acknowledgment
-Show your appreciation to those who have contributed to the project.
+**Tasks**
+- Study LLM providers (Groq, Hugging Face)
+- Integrate LLM
+- Handle:
+- Timeouts
+- Errors
+- Deprecation issues
+- Add “Thinking…” UI
 
-## License
-For open source projects, say how it is licensed.
+**Deliverables**
+- ✅ AI-generated answers
+- ✅ Error-handled LLM calls
 
-## Project status
-If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
+---
+
+### 🟢 Week 5 – Website Content Indexing (Core Feature)
+**Goals**
+- Make answers website-contextual
+
+**Tasks**
+- Explain iframe limitation
+- Implement backend indexing:
+- Manual content file OR
+- Auto crawler
+- Inject website content into prompts
+
+**Deliverables**
+- ✅ Context-aware chatbot
+- ✅ Website-specific answers
+
+---
+
+### 🟢 Week 6 – Enhancements & UX Improvements
+**Goals**
+- Improve accuracy & UX
+
+**Tasks**
+- Loading states
+- Error messages
+- Clear chat history
+- Prompt refinement
+- Hallucination reduction
+- UI improvements
+
+**Deliverables**
+- ✅ Better answers
+- ✅ Stable UI
+
+---
+
+### 🟢 Week 7 – Testing, Security & Optimization
+**Goals**
+- Make project review-ready
+
+**Tasks**
+- Edge case testing
+- Multiple question testing
+- Explain security:
+- iframe limitations
+- backend indexing
+- Optimize:
+- Prompt size
+- Response time
+
+**Deliverables**
+- ✅ Stable build
+- ✅ Security explanation
+
+---
+
+### 🟢 Week 8 – Documentation & Final Demo
+**Goals**
+- Prepare for evaluation
+
+**Tasks**
+- Architecture diagram
+- Sequence diagram
+- System flow explanation
+- README
+- Demo script
+- Future scope
+
+**Deliverables**
+- ✅ Final demo
+- ✅ Complete documentation
+- ✅ Confident explanation
+
+---
+
+## 🔒 Security Explanation
+
+### Why iframe content isn’t read?
+- Browser **Same-Origin Policy**
+- JavaScript cannot access iframe DOM from another origin
+
+### Why backend indexing?
+- Backend fetches & stores website content
+- Content injected into LLM prompt securely
+- Prevents frontend security violations
+
+---
+
+## 🚧 Future Scope
+
+- Vector database (FAISS / Pinecone)
+- User role-based access
+- Multi-website support
+- Conversation memory
+- Admin dashboard
+- Analytics & logging
+
+---
+
+## 📌 Conclusion
+
+This project demonstrates a **real-world AI copilot system** with strong fundamentals in:
+- Web security
+- Full-stack development
+- LLM integration
+- System design & documentation
+
+---
+
+👨‍💻 **Author:** vamshee
+📅 **Duration:** 8 Weeks  

@@ -1,0 +1,95 @@
+* {
+  box-sizing: border-box;
+  font-family: Inter, Arial, sans-serif;
+}
+
+body {
+  margin: 0;
+  color: #222;
+}
+
+/* ===== FULL PAGE BACKGROUND ===== */
+.auth-bg {
+  position: relative;              /* ✅ REQUIRED */
+  min-height: 100vh;
+  width: 100vw;
+  background: url("/images/auth-bg.jpg") center / cover no-repeat;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/* ✅ OVERLAY (NO CLICK BLOCKING) */
+.auth-bg::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.25);
+  pointer-events: none;            /* ✅ FIX */
+}
+
+.auth-bg > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* ===== CARD ===== */
+.auth-card {
+  width: 900px;
+  height: 500px;
+  background: #000000;
+  border-radius: 16px;
+  display: flex;
+  overflow: hidden;
+  box-shadow: 0 30px 70px rgba(0, 0, 0, 0.4);
+}
+
+/* ===== SIDE IMAGE ===== */
+.auth-side-image {
+  flex: 1;
+  background: url("/images/login-side.jpg") center / cover no-repeat;
+}
+
+/* ===== FORM ===== */
+.auth-form {
+  flex: 1;
+  padding: 45px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 14px;
+  color: white;     
+}
+
+input {
+  padding: 12px;
+  font-size: 15px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+}
+
+button {
+  padding: 12px;
+  font-size: 15px;
+  background: #2563eb;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+button:hover {
+  background: #1e40af;
+}
+
+/* ===== MOBILE ===== */
+@media (max-width: 768px) {
+  .auth-card {
+    width: 92%;
+    height: auto;
+  }
+
+  .auth-side-image {
+    display: none;
+  }
+}

@@ -1,6 +1,5 @@
 import streamlit as st
 from dotenv import load_dotenv
-import pickle
 from PyPDF2 import PdfReader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.embeddings import HuggingFaceEmbeddings
@@ -40,7 +39,6 @@ body {
     margin: auto;
 }
 
-/* USER MESSAGE */
 .user-msg {
     background: linear-gradient(135deg,#22c55e,#4ade80);
     color:#052e16;
@@ -51,6 +49,7 @@ body {
     margin-top:10px;
     font-weight:500;
 }
+
 .bot-msg {
     background: rgba(255,255,255,0.9);
     color:#020617;
@@ -60,31 +59,13 @@ body {
     margin-right:auto;
     margin-top:10px;
 }
-section[data-testid="stSidebar"] {
-    background: rgba(0,0,0,0.6);
-    backdrop-filter: blur(10px);
-}
 
 </style>
 """, unsafe_allow_html=True)
 
 # ---------------- SIDEBAR ----------------
 with st.sidebar:
-    st.title("🤗💬 PDF Chatbot")
-
-    st.markdown("""
-    ### About
-    Chat with your PDF using AI.
-
-    **Tech Stack**
-    - Streamlit
-    - LangChain (RAG)
-    - HuggingFace Embeddings
-    - FAISS Vector Search
-    - Groq LLaMA-3
-    """)
-
-    st.write("Made with ❤️ by Vamshee")
+    st.title("PDF Chatbot")
 
 # ---------------- GROQ CLIENT ----------------
 client = Groq(api_key=os.getenv("GROQ_API_KEY"))
@@ -105,40 +86,31 @@ def query_llm(prompt):
 
 
 # ---------------- PDF PROCESSING ----------------
-def process_pdf(pdf):
+def process_pdfs(pdfs):
 
-    pdf_reader = PdfReader(pdf)
+    all_text = ""
 
-    text = ""
+    for pdf in pdfs:
+        pdf_reader = PdfReader(pdf)
 
-    for page in pdf_reader.pages:
-        extracted = page.extract_text()
-        if extracted:
-            text += extracted
+        for page in pdf_reader.pages:
+            extracted = page.extract_text()
+
+            if extracted:
+                all_text += extracted
 
     text_splitter = RecursiveCharacterTextSplitter(
         chunk_size=1000,
         chunk_overlap=200
     )
 
-    chunks = text_splitter.split_text(text)
+    chunks = text_splitter.split_text(all_text)
 
-    store_name = pdf.name.replace(".pdf","")
+    embeddings = HuggingFaceEmbeddings(
+        model_name="sentence-transformers/all-MiniLM-L6-v2"
+    )
 
-    if os.path.exists(f"{store_name}.pkl"):
-        with open(f"{store_name}.pkl","rb") as f:
-            vectorstore = pickle.load(f)
-
-    else:
-
-        embeddings = HuggingFaceEmbeddings(
-            model_name="sentence-transformers/all-MiniLM-L6-v2"
-        )
-
-        vectorstore = FAISS.from_texts(chunks, embeddings)
-
-        with open(f"{store_name}.pkl","wb") as f:
-            pickle.dump(vectorstore,f)
+    vectorstore = FAISS.from_texts(chunks, embeddings)
 
     return vectorstore
 
@@ -147,30 +119,37 @@ def process_pdf(pdf):
 def main():
 
     st.title("📄 Chat With Your PDF")
-    st.caption("Ask questions and get answers directly from your document.")
+    st.caption("Ask questions and get answers directly from your documents.")
 
     if "messages" not in st.session_state:
         st.session_state.messages = []
 
-    pdf = st.file_uploader("Upload your PDF", type="pdf")
+    pdfs = st.file_uploader(
+        "Upload your PDFs",
+        type="pdf",
+        accept_multiple_files=True
+    )
 
-    if pdf is not None:
+    if pdfs:
 
-        # PDF Preview
+        # Sidebar preview
         st.sidebar.subheader("📄 PDF Preview")
 
-        base64_pdf = base64.b64encode(pdf.read()).decode('utf-8')
+        for pdf in pdfs:
 
-        pdf_display = f'''
-        <iframe src="data:application/pdf;base64,{base64_pdf}"
-        width="100%" height="500"></iframe>
-        '''
+            base64_pdf = base64.b64encode(pdf.read()).decode('utf-8')
 
-        st.sidebar.markdown(pdf_display, unsafe_allow_html=True)
+            pdf_display = f"""
+            <iframe src="data:application/pdf;base64,{base64_pdf}"
+            width="100%" height="400"></iframe>
+            """
 
-        vectorstore = process_pdf(pdf)
+            st.sidebar.markdown(f"### {pdf.name}", unsafe_allow_html=True)
+            st.sidebar.markdown(pdf_display, unsafe_allow_html=True)
 
-        # Render chat history
+        vectorstore = process_pdfs(pdfs)
+
+        # Chat history
         for message in st.session_state.messages:
 
             if message["role"] == "user":
@@ -185,12 +164,12 @@ def main():
                     unsafe_allow_html=True
                 )
 
-        query = st.chat_input("Ask a question about your PDF")
+        query = st.chat_input("Ask a question about your PDFs")
 
         if query:
 
             st.session_state.messages.append(
-                {"role":"user","content":query}
+                {"role": "user", "content": query}
             )
 
             st.markdown(
@@ -198,16 +177,18 @@ def main():
                 unsafe_allow_html=True
             )
 
-            docs = vectorstore.similarity_search(query,k=8)
+            docs = vectorstore.similarity_search(query, k=15)
 
             context = "\n\n".join(doc.page_content for doc in docs)
 
             prompt = f"""
-You are an AI assistant answering questions about a PDF.
+You are an AI assistant answering questions using the provided document context.
 
-Use ONLY the context below.
-
-If the answer is not in the document say:
+Rules:
+1. Use the context as the primary source.
+2. Do not assume information not present in the context.
+3. If the context contains partial information, use it to generate a reasonable answer.
+4. If the context truly has no relevant information, say:
 "The answer is not available in the document."
 
 Context:
@@ -215,15 +196,14 @@ Context:
 
 Question:
 {query}
+
+Answer:
 """
 
             with st.spinner("Thinking... ⚡"):
-
                 answer = query_llm(prompt)
 
-            # typing animation
             placeholder = st.empty()
-
             typed = ""
 
             for char in answer:
@@ -235,7 +215,7 @@ Question:
                 time.sleep(0.01)
 
             st.session_state.messages.append(
-                {"role":"assistant","content":answer}
+                {"role": "assistant", "content": answer}
             )
 
 

@@ -6,11 +6,12 @@ from groq import Groq
 import os
 import numpy as np
 from sentence_transformers import SentenceTransformer
-from .models import ChatMessage, WebsiteChunk
+from .models import ChatMessage, WebsiteChunk, Question, Answer
 from .permissions import IsEmployee
 from .serializers import SignupSerializer
 from .services.llm import ask_llm
 from .utils import index_website_with_crawler
+from django.shortcuts import get_object_or_404
 
 
 client = Groq(api_key=os.getenv("GROQ_API_KEY"))
@@ -172,3 +173,209 @@ def chat_history(request):
         }
         for c in chats
     ])
+
+# -----------------------------
+# Create Question
+# -----------------------------
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def create_question(request):
+
+    title = request.data.get("title")
+    description = request.data.get("description")
+
+    if not title or not description:
+        return Response(
+            {"error": "Title and description required"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    Question.objects.create(
+        user=request.user,
+        title=title,
+        description=description
+    )
+
+    return Response(
+        {"message": "Question posted successfully"},
+        status=status.HTTP_201_CREATED
+    )
+
+
+# -----------------------------
+# List Questions
+# -----------------------------
+@api_view(["GET"])
+def list_questions(request):
+
+    search = request.GET.get("search", "")
+
+    questions = Question.objects.filter(
+        title__icontains=search
+    ).order_by("-created_at")
+
+    data = []
+
+    for q in questions:
+        data.append({
+            "id": q.id,
+            "title": q.title,
+            "description": q.description,
+            "user": q.user.username,
+        })
+
+    return Response(data)
+
+
+# -----------------------------
+# Update Question
+# -----------------------------
+@api_view(["PUT"])
+@permission_classes([IsAuthenticated])
+def update_question(request, question_id):
+
+    question = get_object_or_404(Question, id=question_id)
+
+    if question.user != request.user:
+        return Response(
+            {"error": "You cannot edit this question"},
+            status=status.HTTP_403_FORBIDDEN
+        )
+
+    title = request.data.get("title")
+    description = request.data.get("description")
+
+    if title:
+        question.title = title
+
+    if description:
+        question.description = description
+
+    question.save()
+
+    return Response({
+        "message": "Question updated successfully"
+    })
+
+
+# -----------------------------
+# Delete Question
+# -----------------------------
+@api_view(["DELETE"])
+@permission_classes([IsAuthenticated])
+def delete_question(request, question_id):
+
+    question = get_object_or_404(Question, id=question_id)
+
+    if question.user != request.user:
+        return Response(
+            {"error": "You cannot delete this question"},
+            status=status.HTTP_403_FORBIDDEN
+        )
+
+    question.delete()
+
+    return Response({
+        "message": "Question deleted successfully"
+    })
+
+
+# -----------------------------
+# Post Answer
+# -----------------------------
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def post_answer(request, question_id):
+
+    content = request.data.get("content")
+
+    if not content:
+        return Response(
+            {"error": "Answer content required"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    question = get_object_or_404(Question, id=question_id)
+
+    Answer.objects.create(
+        user=request.user,
+        question=question,
+        content=content
+    )
+
+    return Response({
+        "message": "Answer posted successfully"
+    })
+
+
+# -----------------------------
+# Get Answers
+# -----------------------------
+@api_view(["GET"])
+def get_answers(request, question_id):
+
+    answers = Answer.objects.filter(question_id=question_id)
+
+    data = []
+
+    for a in answers:
+        data.append({
+            "id": a.id,
+            "user": a.user.username,
+            "content": a.content
+        })
+
+    return Response(data)
+
+
+# -----------------------------
+# Update Answer
+# -----------------------------
+@api_view(["PUT"])
+@permission_classes([IsAuthenticated])
+def update_answer(request, answer_id):
+
+    answer = get_object_or_404(Answer, id=answer_id)
+
+    if answer.user != request.user:
+        return Response(
+            {"error": "You cannot edit this answer"},
+            status=status.HTTP_403_FORBIDDEN
+        )
+
+    content = request.data.get("content")
+
+    if not content:
+        return Response(
+            {"error": "Content required"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    answer.content = content
+    answer.save()
+
+    return Response({
+        "message": "Answer updated successfully"
+    })
+
+
+# -----------------------------
+# Delete Answer
+# -----------------------------
+@api_view(["DELETE"])
+@permission_classes([IsAuthenticated])
+def delete_answer(request, answer_id):
+
+    answer = get_object_or_404(Answer, id=answer_id)
+
+    if answer.user != request.user:
+        return Response(
+            {"error": "You cannot delete this answer"},
+            status=status.HTTP_403_FORBIDDEN
+        )
+
+    answer.delete()
+
+    return Response({
+        "message": "Answer deleted successfully"
+    })

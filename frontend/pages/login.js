@@ -32,10 +32,10 @@ export default function Login() {
 
   return (
     <div className="auth-bg">
-      <div className="auth-card" style={{margin:'10px'}}>
+      <div className="auth-card">
         <div className="auth-form">
           <h2>Welcome Back 👋</h2>
-          <p className="auth-subtitle">Login to Web Copilot</p>
+          <p className="auth-subtitle"><center>Login to ContextIQ</center></p>
 
           <input placeholder="Email" onChange={(e) => setEmail(e.target.value)} />
           <input type="password" placeholder="Password" onChange={(e) => setPassword(e.target.value)} />

@@ -4,33 +4,57 @@ from urllib.parse import urljoin, urlparse
 from sentence_transformers import SentenceTransformer
 from .models import WebsiteChunk
 
+
 embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
 
 
-# ----------------------------
-# Extract Website Text
-# ----------------------------
-def extract_website_text(url):
+# -----------------------------
+# Extract clean text
+# -----------------------------
+def extract_text(url):
 
-    response = requests.get(
-        url,
-        timeout=10,
-        headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"},
-    )
+    try:
+        response = requests.get(url, timeout=10)
+        soup = BeautifulSoup(response.text, "html.parser")
 
+        # remove unwanted tags
+        for tag in soup(["script", "style", "noscript", "nav", "footer", "header"]):
+            tag.decompose()
+
+        text = soup.get_text(separator=" ")
+
+        return " ".join(text.split())
+
+    except Exception:
+        return ""
+
+
+# -----------------------------
+# Get internal links
+# -----------------------------
+def get_internal_links(url, base_domain):
+
+    response = requests.get(url, timeout=10)
     soup = BeautifulSoup(response.text, "html.parser")
 
-    for tag in soup(["script", "style", "noscript", "nav", "footer", "header"]):
-        tag.decompose()
+    links = set()
 
-    text = soup.get_text(separator=" ")
+    for tag in soup.find_all("a", href=True):
 
-    return " ".join(text.split())
+        href = tag["href"]
+        full_url = urljoin(url, href)
+
+        parsed = urlparse(full_url)
+
+        if parsed.netloc == base_domain:
+            links.add(full_url.split("#")[0])
+
+    return list(links)
 
 
-# ----------------------------
-# Chunk Text
-# ----------------------------
+# -----------------------------
+# Chunk text
+# -----------------------------
 def chunk_text(text, chunk_size=200):
 
     words = text.split()
@@ -41,83 +65,50 @@ def chunk_text(text, chunk_size=200):
     ]
 
 
-# ----------------------------
-# Crawl Website
-# ----------------------------
-def crawl_website(start_url, max_pages=50):
+# -----------------------------
+# Crawl and index website
+# -----------------------------
+def index_website_with_crawler(start_url):
+
+    WebsiteChunk.objects.all().delete()
+
+    base_domain = urlparse(start_url).netloc
 
     visited = set()
     to_visit = [start_url]
 
-    base_domain = urlparse(start_url).netloc
-
-    while to_visit and len(visited) < max_pages:
+    while to_visit and len(visited) < 20:
 
         url = to_visit.pop(0)
 
         if url in visited:
             continue
 
-        try:
+        visited.add(url)
 
-            response = requests.get(
-                    url,
-                    timeout=10,
-                    headers={
-                        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
-                    }
-                )
-            soup = BeautifulSoup(response.text, "html.parser")
+        print(f"✔ Crawled: {url}")
 
-            visited.add(url)
+        text = extract_text(url)
 
-            for link in soup.find_all("a", href=True):
-
-                full_url = urljoin(url, link["href"])
-                parsed = urlparse(full_url)
-
-                if (
-                    parsed.netloc == base_domain
-                    and full_url not in visited
-                    and "#" not in full_url
-                ):
-                    to_visit.append(full_url)
-
-        except Exception:
+        if not text or len(text) < 200:
             continue
 
-    return visited
+        chunks = chunk_text(text)
 
+        for chunk in chunks:
 
-# ----------------------------
-# Index Website
-# ----------------------------
-def index_website_with_crawler(start_url):
+            vector = embedding_model.encode(chunk).tolist()
 
-    WebsiteChunk.objects.all().delete()
+            WebsiteChunk.objects.create(
+                url=url,
+                content=chunk,
+                embedding=vector,
+            )
 
-    urls = crawl_website(start_url, max_pages=20)
+        links = get_internal_links(url, base_domain)
 
-    for url in urls:
+        for link in links:
+            if link not in visited:
+                to_visit.append(link)
 
-        try:
-
-            text = extract_website_text(url)
-
-            if not text or len(text) < 200:
-                continue
-
-            chunks = chunk_text(text)
-
-            for chunk in chunks:
-
-                vector = embedding_model.encode(chunk).tolist()
-
-                WebsiteChunk.objects.create(
-                    url=url,
-                    content=chunk,
-                    embedding=vector,
-                )
-
-        except Exception:
-            continue
+    print("✅ Crawling and indexing complete")

@@ -33,6 +33,11 @@ export default function Dashboard() {
             >
               PDF Chat
             </button>
+            
+            <button style={styles.button}
+            onClick={() => router.push("/forum")}>
+Discussion Forum
+</button>
           </div>
         </div>
       </div>

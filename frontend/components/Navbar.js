@@ -34,8 +34,7 @@ export default function Navbar() {
         style={styles.logoBox}
         onClick={() => router.push(isAuth ? "/dashboard" : "/")}
       >
-        <img src="/logo.webp" alt="ChatAI" style={styles.logoImg} />
-        <span style={styles.logoText}>ChatAI</span>
+        <span style={styles.logoText}>ContextIQ</span>
       </div>
 
       {/* LINKS */}

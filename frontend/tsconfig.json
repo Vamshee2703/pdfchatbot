@@ -29,6 +29,10 @@
     ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts",
     "**/*.mts"
+<<<<<<< HEAD
   ],
+=======
+, "pages/dashboard.js", "components/Navbar.js"  ],
+>>>>>>> origin/main
   "exclude": ["node_modules"]
 }

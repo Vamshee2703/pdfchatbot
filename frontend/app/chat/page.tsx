@@ -2,12 +2,49 @@
 
 import { useState, useRef } from "react";
 
+function escapeRegex(text: string) {
+  return text.replaceAll(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
+}
+
+function highlightText(text: string, highlight: string) {
+  if (!highlight) return text;
+
+  const safeHighlightRaw = highlight.slice(0, 100);
+
+  const safeHighlight = escapeRegex(safeHighlightRaw);
+
+  try {
+    const parts = text.split(new RegExp(`(${safeHighlight})`, "gi"));
+    const lowerHighlight = safeHighlightRaw.toLowerCase();
+
+    return parts.map((part) =>
+      part.toLowerCase() === lowerHighlight ? (
+        <mark key={part} className="bg-yellow-400 text-black px-1 rounded">
+          {part}
+        </mark>
+      ) : (
+        part
+      )
+    );
+  } catch (e) {
+    console.warn("Highlight error:", e);
+    return text;
+  }
+}
+
 export default function Home() {
   const API = process.env.NEXT_PUBLIC_API_URL;
 
   const [files, setFiles] = useState<File[]>([]);
   const [query, setQuery] = useState("");
-  const [messages, setMessages] = useState<any[]>([]);
+type Message = {
+    role: "user" | "bot";
+    content: string;
+    sources?: { page: number; content: string; highlight?: string }[];
+    file?: string | null;
+  };
+
+  const [messages, setMessages] = useState<Message[]>([]);
   const [pdfUrls, setPdfUrls] = useState<string[]>([]);
   const [activePdf, setActivePdf] = useState(0);
 
@@ -17,6 +54,13 @@ export default function Home() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const [sessionId] = useState(() => crypto.randomUUID());
+
+  // 🔥 GO TO PAGE
+  const goToPage = (page: number) => {
+    const url = pdfUrls[activePdf];
+    if (!url) return;
+    window.open(url + `#page=${page}`, "_blank");
+  };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFiles = e.target.files;
@@ -35,9 +79,10 @@ export default function Home() {
 
     setActivePdf(0);
 
-    e.target.value = ""; 
+    e.target.value = "";
   };
 
+  // 🔥 IMPROVED UPLOAD (WITH ERROR LOG)
   const uploadPDF = async () => {
     if (files.length === 0) return;
 
@@ -48,12 +93,19 @@ export default function Home() {
     formData.append("session_id", sessionId);
 
     try {
-      await fetch(`${API}/api/upload/`, {
+      const res = await fetch(`${API}/api/upload/`, {
         method: "POST",
         body: formData,
       });
-    } catch {
-      console.error("Upload failed ❌");
+
+      if (res.ok) {
+        console.log("Upload success ✅");
+      } else {
+        const text = await res.text();
+        console.error("Upload failed:", text);
+      }
+    } catch (err) {
+      console.error("Upload failed ❌", err);
     }
 
     setIsUploading(false);
@@ -62,7 +114,7 @@ export default function Home() {
   const sendMessage = async () => {
     if (!query.trim()) return;
 
-    const newMessages = [...messages, { role: "user", content: query }];
+    const newMessages = [...messages, { role: "user" as const, content: query }];
     setMessages(newMessages);
     setQuery("");
     setIsThinking(true);
@@ -82,7 +134,7 @@ export default function Home() {
 
       const data = await res.json();
 
-      let botMessage = {
+      const botMessage: Message = {
         role: "bot",
         content: "",
         sources: data.sources || [],
@@ -91,10 +143,10 @@ export default function Home() {
 
       setMessages([...newMessages, botMessage]);
 
-      let fullText = data.answer || "No response";
+      const fullText = data.answer || "No response";
       let currentText = "";
 
-      for (let char of fullText) {
+      for (const char of fullText) {
         currentText += char;
 
         setMessages((prev) => {
@@ -108,11 +160,12 @@ export default function Home() {
 
         await new Promise((res) => setTimeout(res, 8));
       }
+    } catch (err) {
+      console.error("Chat error:", err);
 
-    } catch {
       setMessages([
         ...newMessages,
-        { role: "bot", content: "Error ❌", sources: [] },
+        { role: "bot" as const, content: "Error ❌", sources: [] },
       ]);
     }
 
@@ -122,6 +175,7 @@ export default function Home() {
   return (
     <div className="flex h-screen bg-[#0f172a] text-white">
 
+      {/* LEFT: PDF VIEWER */}
       <div className="w-1/2 border-r border-gray-700 p-4 flex flex-col">
 
         <h2 className="mb-3 font-semibold">📄 PDF Preview</h2>
@@ -129,7 +183,7 @@ export default function Home() {
         <div className="flex gap-2 mb-3 overflow-x-auto">
           {files.map((file, i) => (
             <button
-              key={i}
+              key={file.name}
               onClick={() => setActivePdf(i)}
               className={`px-3 py-1 rounded text-sm ${
                 activePdf === i ? "bg-blue-600" : "bg-gray-700"
@@ -142,7 +196,7 @@ export default function Home() {
 
         <div className="flex-1 bg-black rounded overflow-hidden">
           {pdfUrls.length > 0 ? (
-            <iframe src={pdfUrls[activePdf]} className="w-full h-full" />
+            <iframe src={pdfUrls[activePdf]} className="w-full h-full" title="PDF Viewer" />
           ) : (
             <div className="flex items-center justify-center h-full text-gray-500">
               Upload PDFs
@@ -151,6 +205,7 @@ export default function Home() {
         </div>
       </div>
 
+      {/* RIGHT: CHAT */}
       <div className="w-1/2 p-6 flex flex-col">
 
         <h1 className="text-2xl font-bold mb-4">Chat with PDFs</h1>
@@ -168,23 +223,23 @@ export default function Home() {
 
           <button
             onClick={() => fileInputRef.current?.click()}
-            className="bg-gray-700 px-4 py-2 rounded hover:bg-gray-600 transition"
+            className="bg-gray-700 px-4 py-2 rounded hover:bg-gray-600"
           >
             Choose Files
           </button>
 
           <button
             onClick={uploadPDF}
-            className="bg-blue-600 px-4 py-2 rounded hover:bg-blue-700 transition"
+            className="bg-blue-600 px-4 py-2 rounded hover:bg-blue-700"
           >
             {isUploading ? "Uploading..." : "Upload"}
           </button>
         </div>
 
-  
+        {/* CHAT */}
         <div className="flex-1 overflow-y-auto space-y-4 mb-4">
           {messages.map((msg, i) => (
-            <div key={i} className={msg.role === "user" ? "text-right" : ""}>
+            <div key={`${msg.role}-${i}`} className={msg.role === "user" ? "text-right" : ""}>
               <div className="inline-block bg-[#1e293b] p-3 rounded-xl max-w-lg shadow">
 
                 {msg.file && (
@@ -193,9 +248,36 @@ export default function Home() {
                   </div>
                 )}
 
-                <div className="whitespace-pre-wrap leading-relaxed text-[15px]">
+                <div className="whitespace-pre-wrap text-[15px]">
                   {msg.content}
                 </div>
+
+                {/* SOURCES */}
+                {msg.sources && msg.sources.length > 0 && (
+                  <div className="mt-3 space-y-2">
+                    {msg.sources?.map((s, idx) => (
+                      <button
+                        type="button"
+                        key={`source-${s.page}-${idx}`}
+                        className="bg-gray-800 p-2 rounded cursor-pointer hover:bg-gray-700 text-left w-full"
+                        onClick={() => s.page && goToPage(s.page)}
+                        onKeyDown={(e) => {
+                          if ((e.key === "Enter" || e.key === " ") && s.page) {
+                            goToPage(s.page);
+                          }
+                        }}
+                      >
+                        <div className="text-xs text-blue-400 mb-1">
+                          📍 Page {s.page}
+                        </div>
+
+                        <div className="text-sm text-gray-300">
+                          {highlightText(s.content || "", s.highlight || "")}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
 
               </div>
             </div>
@@ -206,42 +288,28 @@ export default function Home() {
           )}
         </div>
 
+        {/* INPUT */}
         <div className="p-3 border-t border-gray-700">
-          <div className="flex items-end gap-2 bg-[#1e293b] rounded-2xl px-4 py-2 shadow border border-gray-600 focus-within:border-blue-500 transition">
+          <div className="flex gap-2 bg-[#1e293b] rounded-2xl px-4 py-2">
 
             <textarea
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Ask anything about your PDFs..."
-              rows={1}
-              className="flex-1 bg-transparent outline-none resize-none text-sm placeholder-gray-400"
-
+              className="flex-1 bg-transparent outline-none resize-none text-sm"
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey) {
                   e.preventDefault();
                   sendMessage();
                 }
               }}
-
-              onInput={(e: any) => {
-                e.target.style.height = "auto";
-                e.target.style.height = e.target.scrollHeight + "px";
-              }}
             />
 
             <button
               onClick={sendMessage}
-              className="bg-blue-600 hover:bg-blue-700 transition px-3 py-2 rounded-xl flex items-center justify-center"
+              className="bg-blue-600 px-3 py-2 rounded-xl"
             >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="h-5 w-5"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="white"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h14M13 6l6 6-6 6" />
-              </svg>
+              ➤
             </button>
 
           </div>

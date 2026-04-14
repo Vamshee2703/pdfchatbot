@@ -1,4 +1,6 @@
 import os
+import re
+import base64
 from dotenv import load_dotenv
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
@@ -13,11 +15,58 @@ load_dotenv()
 client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
 
+# 🔥 Better sentence extraction
+def extract_best_sentence(chunk, query):
+    sentences = re.split(r'[.?!]', chunk)
+
+    for s in sentences:
+        if query.lower() in s.lower():
+            return s.strip()
+
+    return chunk[:200]
+
+
+# 🔥 Chart analysis
+def analyze_chart(image_bytes):
+    base64_image = base64.b64encode(image_bytes).decode("utf-8")
+
+    prompt = """
+Analyze this financial chart.
+
+Explain:
+- Trend (increase/decrease)
+- Peaks and drops
+- Possible business reasons
+
+Keep it short.
+"""
+
+    response = client.chat.completions.create(
+        model="llama-3.2-90b-vision-preview",
+        messages=[
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": prompt},
+                    {
+                        "type": "image_url",
+                        "image_url": f"data:image/png;base64,{base64_image}"
+                    }
+                ],
+            }
+        ],
+        max_tokens=300
+    )
+
+    return response.choices[0].message.content
+
+
 @api_view(["GET"])
 def test(request):
     return Response({"message": "Backend working"})
 
 
+# 🔥 Upload PDF
 @api_view(["POST"])
 def upload_pdf(request):
 
@@ -30,21 +79,20 @@ def upload_pdf(request):
     if not files:
         return Response({"error": "No files uploaded"}, status=400)
 
-    print("SESSION:", session_id)
-    print("FILES:", files)
-
     Document.objects.filter(session_id=session_id).delete()
 
-    process_pdfs(files, session_id)
+    process_pdfs(files, session_id, analyze_chart)
 
     return Response({"message": "PDFs stored successfully ✅"})
 
+
+# 🔥 MAIN CHAT (UPGRADED)
 @api_view(["POST"])
 def chat(request):
 
     query = request.data.get("query")
     session_id = request.data.get("session_id")
-    history = request.data.get("history", [])  # 🔥 NEW
+    history = request.data.get("history", [])
 
     if not query:
         return Response({"error": "No query provided"}, status=400)
@@ -58,11 +106,12 @@ def chat(request):
 
     query_vector = embeddings.embed_query(query)
 
+    # 🔥 IMPROVED RETRIEVAL (MORE CONTEXT)
     results = Document.objects.filter(
         session_id=session_id
     ).annotate(
         distance=CosineDistance("embedding", query_vector)
-    ).order_by("distance")[:10]
+    ).order_by("distance")[:20]   # ⬅️ increased
 
     if len(results) == 0:
         return Response({
@@ -71,8 +120,8 @@ def chat(request):
             "file_used": None
         })
 
+    # 🔥 GROUP BY FILE
     file_groups = {}
-
     for doc in results:
         file_groups.setdefault(doc.file_name, []).append(doc)
 
@@ -81,28 +130,62 @@ def chat(request):
 
     for file, docs in file_groups.items():
         score = sum([d.distance for d in docs]) / len(docs)
-
         if score < best_score:
             best_score = score
             best_file = file
 
     best_docs = file_groups[best_file]
 
+    # 🔥 SPECIAL HANDLING (IMPORTANT 🔥)
+    if "name" in query.lower() or "applicant" in query.lower():
+        for doc in best_docs:
+            if "M/s" in doc.content:
+                return Response({
+                    "answer": f"Applicant name is {doc.content.strip()} (Page {doc.page_number})",
+                    "sources": [],
+                    "file_used": best_file
+                })
+
+    # 🔥 CONTEXT STITCHING (VERY IMPORTANT)
+    stitched_chunks = []
+    for i in range(len(best_docs) - 1):
+        combined = best_docs[i].content + " " + best_docs[i + 1].content
+        stitched_chunks.append(combined)
+
+    # combine original + stitched
+    all_chunks = best_docs + [
+        type("obj", (object,), {
+            "content": chunk,
+            "page_number": 0
+        }) for chunk in stitched_chunks
+    ]
+
     seen = set()
     sources = []
 
-    for doc in best_docs:
+    for doc in all_chunks:
         text = doc.content.strip()
-        if text not in seen:
-            seen.add(text)
-            sources.append(text)
+        key = (text, getattr(doc, "page_number", 0))
 
-    sources = sources[:3]
-    context = "\n\n".join(sources)
+        if key not in seen:
+            seen.add(key)
 
+            sources.append({
+                "content": text,
+                "page": getattr(doc, "page_number", 0),
+                "highlight": extract_best_sentence(text, query)
+            })
+
+    sources = sources[:5]   # ⬅️ increased
+
+    # 🔥 BUILD CONTEXT
+    context = ""
+    for s in sources:
+        context += f"(Page {s['page']}): {s['content']}\n\n"
+
+    # 🔥 CHAT HISTORY
     chat_history = ""
-
-    for msg in history[-6:]:  
+    for msg in history[-6:]:
         role = msg.get("role")
         content = msg.get("content")
 
@@ -111,38 +194,33 @@ def chat(request):
         else:
             chat_history += f"Assistant: {content}\n"
 
-   
+    # 🔥 FINAL PROMPT (SMARTER)
     prompt = f"""
-You are an intelligent PDF assistant.
-
-Use:
-1. Chat history for understanding context
-2. PDF context for factual answers
+You are a financial document analyst.
 
 Rules:
-- Answer ONLY using PDF context
-- Use chat history for follow-up questions
-- If answer not found → say "Not found in documents"
-- Keep answers clean and structured
-- Use bullet points if helpful
+- Extract exact answers when possible
+- Look across multiple lines (data may be split)
+- Do NOT say "not found" if information exists
+- Explain reasoning when needed
+- Mention page numbers
+
+Context:
+{context}
 
 Chat History:
 {chat_history}
 
-PDF Context:
-{context}
-
-User Question:
+Question:
 {query}
 
 Answer:
 """
 
-    
     response = client.chat.completions.create(
         model="llama-3.1-8b-instant",
         messages=[{"role": "user", "content": prompt}],
-        temperature=0.1,
+        temperature=0.2,
         max_tokens=400
     )
 

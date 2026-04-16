@@ -89,7 +89,6 @@ def upload_pdf(request):
 # 🔥 MAIN CHAT (UPGRADED)
 @api_view(["POST"])
 def chat(request):
-
     query = request.data.get("query")
     session_id = request.data.get("session_id")
     history = request.data.get("history", [])
@@ -100,101 +99,111 @@ def chat(request):
     if not session_id:
         return Response({"error": "No session_id"}, status=400)
 
-    embeddings = HuggingFaceEmbeddings(
-        model_name="sentence-transformers/all-MiniLM-L6-v2"
-    )
+    docs, best_file = _retrieve_documents(query, session_id)
 
-    query_vector = embeddings.embed_query(query)
-
-    # 🔥 IMPROVED RETRIEVAL (MORE CONTEXT)
-    results = Document.objects.filter(
-        session_id=session_id
-    ).annotate(
-        distance=CosineDistance("embedding", query_vector)
-    ).order_by("distance")[:20]   # ⬅️ increased
-
-    if len(results) == 0:
+    if not docs:
         return Response({
             "answer": "No data found",
             "sources": [],
             "file_used": None
         })
 
-    # 🔥 GROUP BY FILE
+    name_response = _check_applicant_name(query, docs, best_file)
+    if name_response:
+        return name_response
+
+    sources = _build_sources(docs, query)
+    context = _build_context(sources)
+    chat_history = _build_chat_history(history)
+    answer = _get_ai_response(query, context, chat_history)
+
+    return Response({
+        "answer": answer,
+        "sources": sources,
+        "file_used": best_file
+    })
+
+
+def _retrieve_documents(query, session_id):
+    embeddings = HuggingFaceEmbeddings(
+        model_name="sentence-transformers/all-MiniLM-L6-v2"
+    )
+    query_vector = embeddings.embed_query(query)
+
+    results = Document.objects.filter(
+        session_id=session_id
+    ).annotate(
+        distance=CosineDistance("embedding", query_vector)
+    ).order_by("distance")[:20]
+
+    if not results:
+        return None, None
+
     file_groups = {}
     for doc in results:
         file_groups.setdefault(doc.file_name, []).append(doc)
 
-    best_file = None
-    best_score = float("inf")
+    best_file, best_docs = max(
+        file_groups.items(),
+        key=lambda item: sum(d.distance for d in item[1]) / len(item[1])
+    )
+    return best_docs, best_file
 
-    for file, docs in file_groups.items():
-        score = sum([d.distance for d in docs]) / len(docs)
-        if score < best_score:
-            best_score = score
-            best_file = file
 
-    best_docs = file_groups[best_file]
-
-    # 🔥 SPECIAL HANDLING (IMPORTANT 🔥)
+def _check_applicant_name(query, docs, best_file):
     if "name" in query.lower() or "applicant" in query.lower():
-        for doc in best_docs:
+        for doc in docs:
             if "M/s" in doc.content:
                 return Response({
                     "answer": f"Applicant name is {doc.content.strip()} (Page {doc.page_number})",
                     "sources": [],
                     "file_used": best_file
                 })
+    return None
 
-    # 🔥 CONTEXT STITCHING (VERY IMPORTANT)
-    stitched_chunks = []
-    for i in range(len(best_docs) - 1):
-        combined = best_docs[i].content + " " + best_docs[i + 1].content
-        stitched_chunks.append(combined)
 
-    # combine original + stitched
-    all_chunks = best_docs + [
-        type("obj", (object,), {
-            "content": chunk,
-            "page_number": 0
-        }) for chunk in stitched_chunks
+def _build_sources(docs, query):
+    stitched_chunks = [
+        docs[i].content + " " + docs[i + 1].content
+        for i in range(len(docs) - 1)
+    ]
+
+    all_chunks = docs + [
+        type("obj", (object,), {"content": chunk, "page_number": 0})
+        for chunk in stitched_chunks
     ]
 
     seen = set()
     sources = []
-
     for doc in all_chunks:
         text = doc.content.strip()
-        key = (text, getattr(doc, "page_number", 0))
-
+        page = getattr(doc, "page_number", 0)
+        key = (text, page)
         if key not in seen:
             seen.add(key)
-
             sources.append({
                 "content": text,
-                "page": getattr(doc, "page_number", 0),
+                "page": page,
                 "highlight": extract_best_sentence(text, query)
             })
+    return sources[:5]
 
-    sources = sources[:5]   # ⬅️ increased
 
-    # 🔥 BUILD CONTEXT
-    context = ""
-    for s in sources:
-        context += f"(Page {s['page']}): {s['content']}\n\n"
+def _build_context(sources):
+    return "\n\n".join(f"(Page {s['page']}): {s['content']}" for s in sources)
 
-    # 🔥 CHAT HISTORY
-    chat_history = ""
+
+def _build_chat_history(history):
+    lines = []
     for msg in history[-6:]:
         role = msg.get("role")
         content = msg.get("content")
+        prefix = "User" if role == "user" else "Assistant"
+        lines.append(f"{prefix}: {content}\n")
+    return "".join(lines)
 
-        if role == "user":
-            chat_history += f"User: {content}\n"
-        else:
-            chat_history += f"Assistant: {content}\n"
 
-    # 🔥 FINAL PROMPT (SMARTER)
+def _get_ai_response(query, context, chat_history):
     prompt = f"""
 You are a financial document analyst.
 
@@ -216,18 +225,10 @@ Question:
 
 Answer:
 """
-
     response = client.chat.completions.create(
         model="llama-3.1-8b-instant",
         messages=[{"role": "user", "content": prompt}],
         temperature=0.2,
         max_tokens=400
     )
-
-    answer = response.choices[0].message.content
-
-    return Response({
-        "answer": answer,
-        "sources": sources,
-        "file_used": best_file
-    })
+    return response.choices[0].message.content

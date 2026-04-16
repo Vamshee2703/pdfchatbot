@@ -10,7 +10,7 @@ def clean_text(text):
 
 
 def extract_images_from_pdf(file):
-    file.seek(0)  # 🔥 IMPORTANT (reset pointer)
+    file.seek(0)
     doc = fitz.open(stream=file.read(), filetype="pdf")
 
     images = []

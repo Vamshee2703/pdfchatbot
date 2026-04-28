@@ -23,7 +23,7 @@ def extract_images_from_pdf(file):
             xref = img[0]
             base_image = doc.extract_image(xref)
             image_bytes = base_image["image"]
-            images.append(image_bytes)
+            images.append((image_bytes, page_index + 1))
 
     return images
 
@@ -74,15 +74,18 @@ def _save_page_chunks(content, page_number, file, session_id, splitter, embeddin
 def _process_chart_images(file, session_id, analyze_chart_fn, embeddings):
     try:
         images = extract_images_from_pdf(file)
-        for img in images:
+
+        for img, page_number in images: 
             insight = analyze_chart_fn(img)
+
             if insight and len(insight) > 10:
                 Document.objects.create(
                     content=insight,
                     embedding=embeddings.embed_query(insight),
                     session_id=session_id,
                     file_name=file.name,
-                    page_number=0
+                    page_number=page_number 
                 )
+
     except Exception as e:
         print("Image processing error:", e)

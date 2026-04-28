@@ -1,0 +1,14 @@
+coverage==7.13.0
+dj-database-url==3.1.2
+Django==5.2.13
+django-cors-headers==4.9.0
+djangorestframework==3.17.1
+groq==1.1.2
+langchain-community==0.4.1
+langchain-text-splitters==1.1.1
+pgvector==0.4.2
+psycopg2-binary==2.9.11
+PyMuPDF==1.27.2.2
+PyPDF2==3.0.1
+python-dotenv==1.2.2
+sentence-transformers==5.3.0

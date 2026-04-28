@@ -14,6 +14,10 @@ class TestBackend(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["message"], "Backend working")
 
+    def test_test_endpoint_rejects_unsafe_methods(self):
+        response = self.client.post("/api/test/")
+        self.assertEqual(response.status_code, 405)
+
     @patch("api.views.process_pdfs")
     def test_upload_pdf_success(self, mock_process):
         mock_process.return_value = None
@@ -46,6 +50,10 @@ class TestBackend(TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertIn("error", response.json())
 
+    def test_upload_pdf_rejects_safe_methods(self):
+        response = self.client.get("/api/upload/")
+        self.assertEqual(response.status_code, 405)
+
     def test_chat_no_query(self):
         response = self.client.post("/api/chat/", {
             "session_id": "test-session"
@@ -61,6 +69,10 @@ class TestBackend(TestCase):
         
         self.assertEqual(response.status_code, 400)
         self.assertIn("error", response.json())
+
+    def test_chat_rejects_safe_methods(self):
+        response = self.client.get("/api/chat/")
+        self.assertEqual(response.status_code, 405)
 
     @patch("api.views._retrieve_documents")
     def test_chat_no_documents(self, mock_retrieve):

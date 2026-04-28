@@ -1,6 +1,7 @@
 import os
 import re
 import base64
+from django.views.decorators.http import require_GET, require_POST
 from dotenv import load_dotenv
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
@@ -61,12 +62,14 @@ Keep it short.
     return response.choices[0].message.content
 
 
+@require_GET
 @api_view(["GET"])
 def test(request):
     return Response({"message": "Backend working"})
 
 
 # 🔥 Upload PDF
+@require_POST
 @api_view(["POST"])
 def upload_pdf(request):
 
@@ -87,6 +90,7 @@ def upload_pdf(request):
 
 
 # 🔥 MAIN CHAT (UPGRADED)
+@require_POST
 @api_view(["POST"])
 def chat(request):
     query = request.data.get("query")

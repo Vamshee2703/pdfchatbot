@@ -38,8 +38,8 @@ jobs:
       - name: Run backend tests with coverage
         working-directory: backend
         run: |
-          coverage run manage.py test api
-          coverage xml -o coverage.xml
+          coverage run --rcfile=.coveragerc manage.py test api
+          coverage xml --rcfile=.coveragerc -o coverage.xml
 
       - name: SonarQube Scan
         uses: SonarSource/sonarqube-scan-action@fd88b7d7ccbaefd23d8f36f73b59db7a3d246602 # v6.0.0

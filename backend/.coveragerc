@@ -1,0 +1,8 @@
+[run]
+source = api
+omit =
+    api/migrations/*
+    api/tests.py
+
+[report]
+show_missing = True
